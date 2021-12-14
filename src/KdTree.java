@@ -23,18 +23,18 @@ public class KdTree {
     if (p == null) {
       throw new IllegalArgumentException();
     }
-    root = insert(root, p, X_AXIS);
+    root = insert(root, p, new RectHV(0, 0, 1, 1), X_AXIS);
   }
 
-  private Node insert(Node node, Point2D p, boolean axis) {
+  private Node insert(Node node, Point2D p, RectHV pointRect, boolean axis) {
     if (node == null) {
       size++;
-      return new Node(p, axis);
+      return new Node(p, pointRect, axis);
     }
     if (node.axis == X_AXIS && p.x() > node.point.x() || node.axis == Y_AXIS && p.y() > node.point.y()) {
-      node.right = insert(node.right, p, !node.axis);
+      node.right = insert(node.right, p, getRightRect(node, pointRect), !node.axis);
     } else {
-      node.left = insert(node.left, p, !node.axis);
+      node.left = insert(node.left, p, getLeftRect(node, pointRect), !node.axis);
     }
     return node;
   }
@@ -60,10 +60,10 @@ public class KdTree {
   }
 
   public void draw() {
-    draw(root, new RectHV(0, 0, 1, 1));
+    draw(root);
   }
 
-  private void draw(final Node node, RectHV field) {
+  private void draw(final Node node) {
     if (node == null) {
       return;
     }
@@ -72,19 +72,19 @@ public class KdTree {
     if (node.axis == X_AXIS) {
       final double xPoint = node.point.x();
       StdDraw.setPenColor(StdDraw.RED);
-      lineStart = new Point2D(xPoint, field.ymax());
-      lineEnd = new Point2D(xPoint, field.ymin());
+      lineStart = new Point2D(xPoint, node.rect.ymax());
+      lineEnd = new Point2D(xPoint, node.rect.ymin());
     } else {
       final double yPoint = node.point.y();
       StdDraw.setPenColor(StdDraw.BLUE);
-      lineStart = new Point2D(field.xmax(), yPoint);
-      lineEnd = new Point2D(field.xmin(), yPoint);
+      lineStart = new Point2D(node.rect.xmax(), yPoint);
+      lineEnd = new Point2D(node.rect.xmin(), yPoint);
     }
     lineStart.drawTo(lineEnd);
     StdDraw.setPenColor(StdDraw.BLACK);
     node.point.draw();
-    draw(node.left, getLeftRect(node, field));
-    draw(node.right, getRightRect(node, field));
+    draw(node.left);
+    draw(node.right);
   }
 
   public Iterable<Point2D> range(RectHV rect) {
@@ -106,10 +106,10 @@ public class KdTree {
         queue.enqueue(point);
       }
       if (node.left != null) {
-        range(node.left, rect, getLeftRect(node.left, pointRect), queue);
+        range(node.left, rect, getLeftRect(node, pointRect), queue);
       }
       if (node.right != null) {
-        range(node.right, rect, getRightRect(node.right, pointRect), queue);
+        range(node.right, rect, getRightRect(node, pointRect), queue);
       }
     }
   }
@@ -132,20 +132,41 @@ public class KdTree {
     if (p == null) {
       throw new IllegalArgumentException();
     }
-    return null;
+    return nearest(root, p, root.point);
   }
 
+  private Point2D nearest(Node node, Point2D p, Point2D candidate) {
+    if (node == null) {
+      return candidate;
+    }
+    if (node.point.distanceTo(p) < candidate.distanceTo(p)) {
+      candidate = node.point;
+    }
+    if (node.rect.distanceTo(p) < candidate.distanceTo(p)) {
+      if ((node.axis == X_AXIS && p.x() < node.point.x()) || (node.axis == Y_AXIS && p.y() < node.point.y())) {
+        candidate = nearest(node.left, p, candidate);
+        candidate = nearest(node.right, p, candidate);
+      } else {
+        candidate = nearest(node.right, p, candidate);
+        candidate = nearest(node.left, p, candidate);
+      }
+    }
+
+    return candidate;
+  }
 
   private class Node {
 
     private final Point2D point;
+    private final RectHV rect;
     private final boolean axis;
     private Node left;
     private Node right;
 
-    public Node(Point2D point, boolean axis) {
-      this.axis = axis;
+    public Node(Point2D point, RectHV rect, boolean axis) {
       this.point = point;
+      this.rect = rect;
+      this.axis = axis;
     }
   }
 }
